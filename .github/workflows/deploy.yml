@@ -1,0 +1,62 @@
+name: Docker Build -> Push -> Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Setup Java 17
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Build Spring Boot JAR
+      - name: Build Jar
+        run: ./mvnw clean package -DskipTests
+
+      # Login to Docker Hub
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login \
+          -u "${{ secrets.DOCKER_USERNAME }}" \
+          --password-stdin
+
+      # Build Docker Image
+      - name: Build Docker Image
+        run: |
+          docker build -t abdulazizhussain/spring-boot-clidemo:latest .
+
+      # Push Image to Docker Hub
+      - name: Push Image to Docker Hub
+        run: |
+          docker push abdulazizhussain/spring-boot-clidemo:latest
+
+      # Deploy to EC2
+      - name: SSH and Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker stop spring-boot-clidemo || true
+            docker rm spring-boot-clidemo || true
+
+            docker pull abdulazizhussain/spring-boot-clidemo:latest
+
+            docker run -d \
+              --name spring-boot-clidemo \
+              -p 8080:8080 \
+              --restart unless-stopped \
+              abdulazizhussain/spring-boot-clidemo:latest
