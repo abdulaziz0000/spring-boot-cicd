@@ -55,6 +55,10 @@ jobs:
             docker stop spring-boot-clidemo || true
             docker rm spring-boot-clidemo || true
 
+            # Also kill any container bound to port 8080, regardless of name
+            docker ps -q --filter "publish=8080" | xargs -r docker stop
+            docker ps -aq --filter "publish=8080" | xargs -r docker rm
+
             docker pull abdulazizhussain/spring-boot-clidemo:latest
 
             docker run -d \
